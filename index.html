@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Runner Game</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(#87CEEB, #E0F6FF);
+            text-align: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-top: 20px;
+            color: #222;
+        }
+
+        #score {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 15px;
+        }
+
+        #game {
+            width: 800px;
+            max-width: 95vw;
+            height: 350px;
+            margin: 20px auto;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(#87CEEB 70%, #75C850 70%);
+            border: 4px solid #333;
+            border-radius: 12px;
+        }
+
+        #player {
+            position: absolute;
+            left: 70px;
+            bottom: 90px;
+            width: 45px;
+            height: 55px;
+            font-size: 45px;
+            line-height: 55px;
+            user-select: none;
+        }
+
+        #ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 90px;
+            background: #75C850;
+            border-top: 5px solid #397D35;
+        }
+
+        .obstacle {
+            position: absolute;
+            bottom: 90px;
+            width: 30px;
+            height: 45px;
+            background: #8B4513;
+            border-radius: 8px 8px 2px 2px;
+        }
+
+        .cloud {
+            position: absolute;
+            font-size: 40px;
+        }
+
+        #cloud1 {
+            top: 25px;
+            left: 180px;
+        }
+
+        #cloud2 {
+            top: 65px;
+            right: 100px;
+        }
+
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #e94e1b;
+        }
+
+        #message {
+            font-size: 20px;
+            font-weight: bold;
+            color: #222;
+            min-height: 28px;
+        }
+
+        p {
+            margin: 10px;
+        }
+
+        @media (max-width: 600px) {
+            #game {
+                height: 300px;
+            }
+
+            #player {
+                left: 35px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🏃 Super Runner</h1>
+
+    <div id="score">Score: 0</div>
+
+    <div id="game">
+        <div class="cloud" id="cloud1">☁️</div>
+        <div class="cloud" id="cloud2">☁️</div>
+
+        <div id="ground"></div>
+        <div id="player">🏃</div>
+    </div>
+
+    <div id="message">Press SPACE or tap JUMP to start!</div>
+
+    <button id="jumpBtn">⬆ JUMP</button>
+    <button id="restartBtn">🔄 Restart</button>
+
+    <p>Controls: Press SPACE, ↑, or tap JUMP to jump over obstacles!</p>
+
+    <script>
+        const game = document.getElementById("game");
+        const player = document.getElementById("player");
+        const scoreDisplay = document.getElementById("score");
+        const message = document.getElementById("message");
+        const jumpBtn = document.getElementById("jumpBtn");
+        const restartBtn = document.getElementById("restartBtn");
+
+        let playerY = 0;
+        let velocity = 0;
+        let jumping = false;
+        let running = false;
+        let gameOver = false;
+        let score = 0;
+        let speed = 5;
+        let obstacles = [];
+        let lastObstacle = 0;
+        let lastTime = 0;
+        let animationId;
+
+        const gravity = 0.7;
+        const jumpPower = 13;
+
+        function startGame() {
+            if (running || gameOver) return;
+
+            running = true;
+            message.textContent = "Run and jump over the obstacles!";
+            lastTime = performance.now();
+
+            animationId = requestAnimationFrame(update);
+        }
+
+        function jump() {
+            if (gameOver) return;
+
+            if (!running) {
+                startGame();
+            }
+
+            if (!jumping) {
+                velocity = jumpPower;
+                jumping = true;
+            }
+        }
+
+        function createObstacle() {
+            const obstacle = document.createElement("div");
+
+            obstacle.className = "obstacle";
+            obstacle.style.left = game.clientWidth + "px";
+
+            game.appendChild(obstacle);
+
+            obstacles.push({
+                element: obstacle,
+                x: game.clientWidth,
+                passed: false
+            });
+        }
+
+        function update(time) {
+            if (!running || gameOver) return;
+
+            const delta = Math.min((time - lastTime) / 16.67, 2);
+            lastTime = time;
+
+            // Make the player jump
+            playerY += velocity * delta;
+            velocity -= gravity * delta;
+
+            if (playerY <= 0) {
+                playerY = 0;
+                velocity = 0;
+                jumping = false;
+            }
+
+            player.style.bottom = (90 + playerY) + "px";
+
+            // Increase score and difficulty
+            score += delta * 0.1;
+            speed = 5 + Math.min(score / 100, 5);
+
+            scoreDisplay.textContent =
+                "Score: " + Math.floor(score);
+
+            // Create new obstacles
+            lastObstacle += delta;
+
+            if (lastObstacle > Math.max(45, 95 - speed * 5)) {
+                createObstacle();
+                lastObstacle = 0;
+            }
+
+            // Move obstacles and check collisions
+            const playerLeft = player.offsetLeft;
+            const playerRight = playerLeft + player.offsetWidth;
+            const playerBottom = 90 + playerY;
+            const playerTop = playerBottom + player.offsetHeight;
+
+            obstacles.forEach((obstacle) => {
+                obstacle.x -= speed * delta;
+
+                obstacle.element.style.left =
+                    obstacle.x + "px";
+
+                const obstacleLeft = obstacle.x;
+                const obstacleRight = obstacleLeft +
+                    obstacle.element.offsetWidth;
+
+                const obstacleTop = 90 +
+                    obstacle.element.offsetHeight;
+
+                const horizontalCollision =
+                    playerRight > obstacleLeft + 4 &&
+                    playerLeft + 5 < obstacleRight;
+
+                const verticalCollision =
+                    playerBottom < obstacleTop &&
+                    playerTop > 90;
+
+                if (horizontalCollision && verticalCollision) {
+                    endGame();
+                }
+
+                if (!obstacle.passed &&
+                    obstacleRight < playerLeft) {
+                    obstacle.passed = true;
+                    score += 5;
+                }
+            });
+
+            // Remove obstacles that leave the screen
+            obstacles = obstacles.filter((obstacle) => {
+                if (obstacle.x < -40) {
+                    obstacle.element.remove();
+                    return false;
+                }
+
+                return true;
+            });
+
+            if (!gameOver) {
+                animationId = requestAnimationFrame(update);
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            running = false;
+
+            cancelAnimationFrame(animationId);
+
+            message.textContent =
+                "💥 Game Over! Your score: " +
+                Math.floor(score);
+        }
+
+        function restartGame() {
+            cancelAnimationFrame(animationId);
+
+            obstacles.forEach((obstacle) => {
+                obstacle.element.remove();
+            });
+
+            obstacles = [];
+            score = 0;
+            speed = 5;
+            playerY = 0;
+            velocity = 0;
+            jumping = false;
+            running = false;
+            gameOver = false;
+            lastObstacle = 0;
+
+            player.style.bottom = "90px";
+            scoreDisplay.textContent = "Score: 0";
+            message.textContent =
+                "Press SPACE or tap JUMP to start!";
+
+            startGame();
+        }
+
+        document.addEventListener("keydown", (event) => {
+            if (event.code === "Space" ||
+                event.code === "ArrowUp") {
+                event.preventDefault();
+
+                if (!event.repeat) {
+                    jump();
+                }
+            }
+        });
+
+        jumpBtn.addEventListener("click", jump);
+        restartBtn.addEventListener("click", restartGame);
+
+        // Allow jumping by tapping the game area on mobile
+        game.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            jump();
+        }, { passive: false });
+    </script>
+
+</body>
+</html>
